@@ -99,13 +99,11 @@
       outputSize: document.getElementById('outputSize'),
       resetButton: document.getElementById('resetButton'),
       downloadButton: document.getElementById('downloadButton'),
-      openButton: document.getElementById('openButton'),
       zoomSlider: document.getElementById('zoomSlider'),
       zoomValue: document.getElementById('zoomValue'),
       statusNote: document.getElementById('statusNote'),
       dragToast: document.getElementById('dragToast'),
-      dismissToast: document.getElementById('dismissToast'),
-      closeButton: document.getElementById('closeButton')
+      dismissToast: document.getElementById('dismissToast')
     };
 
     function init() {
@@ -284,26 +282,9 @@
         elements.statusNote.textContent = '画像を書き出しました。';
       });
 
-      elements.openButton.addEventListener('click', async () => {
-        if (!state.image) {
-          elements.statusNote.textContent = '先に画像をアップロードしてください。';
-          return;
-        }
-        const blob = await exportBlob();
-        if (!blob) return;
-        if (state.previewBlobUrl) URL.revokeObjectURL(state.previewBlobUrl);
-        state.previewBlobUrl = URL.createObjectURL(blob);
-        window.open(state.previewBlobUrl, '_blank', 'noopener');
-        elements.statusNote.textContent = '生成結果を新しいタブで開きました。';
-      });
-
       elements.dismissToast.addEventListener('click', () => {
         state.toastDismissed = true;
         updateToast();
-      });
-
-      elements.closeButton.addEventListener('click', () => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
 
       setupDragging();

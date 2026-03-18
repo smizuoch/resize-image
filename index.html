@@ -61,26 +61,6 @@
       grid-template-columns: minmax(0, 1.78fr) minmax(360px, 434px);
     }
 
-    .close-button {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      width: 40px;
-      height: 40px;
-      border: 0;
-      border-radius: 999px;
-      background: transparent;
-      color: #333;
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      z-index: 10;
-    }
-
-    .close-button:hover {
-      background: rgba(0, 0, 0, 0.06);
-    }
-
     .workspace {
       background: #efeff2;
       padding: 28px 28px 20px;
@@ -690,12 +670,6 @@
 <body>
   <div class="app-shell">
     <div class="dialog" role="dialog" aria-modal="true" aria-label="画像のサイズを変更">
-      <button class="close-button" type="button" aria-label="閉じる" title="閉じる" id="closeButton">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <path d="M5 5L15 15M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-        </svg>
-      </button>
-
       <section class="workspace">
         <label class="dropzone" id="dropzone" tabindex="0" aria-label="画像をアップロード">
           <input class="sr-only" id="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" />
@@ -807,7 +781,6 @@
 
           <div class="button-row">
             <button class="primary" id="downloadButton" type="button">ダウンロード</button>
-            <button class="secondary" id="openButton" type="button">エディターで開く</button>
           </div>
           <div class="status-note" id="statusNote"></div>
         </div>
@@ -916,13 +889,11 @@
       outputSize: document.getElementById('outputSize'),
       resetButton: document.getElementById('resetButton'),
       downloadButton: document.getElementById('downloadButton'),
-      openButton: document.getElementById('openButton'),
       zoomSlider: document.getElementById('zoomSlider'),
       zoomValue: document.getElementById('zoomValue'),
       statusNote: document.getElementById('statusNote'),
       dragToast: document.getElementById('dragToast'),
-      dismissToast: document.getElementById('dismissToast'),
-      closeButton: document.getElementById('closeButton')
+      dismissToast: document.getElementById('dismissToast')
     };
 
     function init() {
@@ -1101,26 +1072,9 @@
         elements.statusNote.textContent = '画像を書き出しました。';
       });
 
-      elements.openButton.addEventListener('click', async () => {
-        if (!state.image) {
-          elements.statusNote.textContent = '先に画像をアップロードしてください。';
-          return;
-        }
-        const blob = await exportBlob();
-        if (!blob) return;
-        if (state.previewBlobUrl) URL.revokeObjectURL(state.previewBlobUrl);
-        state.previewBlobUrl = URL.createObjectURL(blob);
-        window.open(state.previewBlobUrl, '_blank', 'noopener');
-        elements.statusNote.textContent = '生成結果を新しいタブで開きました。';
-      });
-
       elements.dismissToast.addEventListener('click', () => {
         state.toastDismissed = true;
         updateToast();
-      });
-
-      elements.closeButton.addEventListener('click', () => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
 
       setupDragging();
