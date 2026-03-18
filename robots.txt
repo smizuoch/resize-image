@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://smizuoch.me/resize-image/sitemap.xml
