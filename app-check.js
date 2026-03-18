@@ -12,6 +12,11 @@
         { id: 'youtube-square', label: '正方形', width: 1080, height: 1080 },
         { id: 'youtube-banner', label: 'バナー', width: 2560, height: 1440 }
       ],
+      VRChat: [
+        { id: 'vrchat-thumbnail', label: 'サムネイル', width: 1200, height: 900 },
+        { id: 'vrchat-icon', label: 'アイコン', width: 1080, height: 1080 },
+        { id: 'vrchat-banner', label: 'バナー', width: 1920, height: 1080 }
+      ],
       Facebook: [
         { id: 'facebook-post', label: '投稿', width: 1200, height: 630 },
         { id: 'facebook-story', label: 'ストーリー', width: 1080, height: 1920 },
@@ -122,6 +127,7 @@
       const labels = {
         Instagram: 'Instagram',
         YouTube: 'YouTube',
+        VRChat: 'VRChat',
         Facebook: 'Facebook',
         LinkedIn: 'LinkedIn',
         Snapchat: 'Snapchat',
