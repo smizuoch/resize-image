@@ -71,6 +71,10 @@
       imageHeight: 0,
       offsetX: 0,
       offsetY: 0,
+      cropX: 0,
+      cropY: 0,
+      cropW: 0,
+      cropH: 0,
       toastDismissed: false,
       estimateTimer: null,
       previewBlobUrl: ''
@@ -82,6 +86,8 @@
       editorLayout: document.getElementById('editorLayout'),
       cropStage: document.getElementById('cropStage'),
       cropImage: document.getElementById('cropImage'),
+      cropGrid: document.getElementById('cropGrid'),
+      cropOverlay: document.getElementById('cropOverlay'),
       groupSelect: document.getElementById('groupSelect'),
       presetSection: document.getElementById('presetSection'),
       presetGrid: document.getElementById('presetGrid'),
@@ -301,8 +307,13 @@
       });
 
       setupDragging();
+      setupCropBoxDragging();
       window.addEventListener('resize', () => {
         if (!state.image) return;
+        const stageRect = elements.cropStage.getBoundingClientRect();
+        state.cropX = clamp(state.cropX, 0, Math.max(0, stageRect.width - state.cropW));
+        state.cropY = clamp(state.cropY, 0, Math.max(0, stageRect.height - state.cropH));
+        updateCropBox();
         fitImageToViewport(false, true);
       });
     }
@@ -328,12 +339,19 @@
         state.originalWidth = image.naturalWidth;
         state.originalHeight = image.naturalHeight;
         state.originalSize = file.size;
+        state.width = image.naturalWidth;
+        state.height = image.naturalHeight;
+        state.selectedGroup = 'Custom';
+        state.activePresetId = null;
+        state.cropW = 0;
+        state.cropH = 0;
         state.toastDismissed = false;
+        elements.groupSelect.value = 'Custom';
         elements.cropImage.src = state.imageURL;
         elements.editorLayout.classList.add('active');
         elements.dropzone.classList.add('hidden');
+        syncDimensionInputs();
         renderPresets();
-        updateCanvasAspect();
         fitImageToViewport(true);
         elements.originalSize.textContent = formatBytes(file.size);
         estimateOutputSize();
@@ -391,7 +409,22 @@
     }
 
     function updateCanvasAspect() {
-      elements.cropStage.style.aspectRatio = `${state.width} / ${state.height}`;
+      if (!state.image || !state.cropW || !state.cropH) return;
+      const stageRect = elements.cropStage.getBoundingClientRect();
+      if (!stageRect.width || !stageRect.height) return;
+      const aspect = state.width / state.height;
+      const centerX = state.cropX + state.cropW / 2;
+      const centerY = state.cropY + state.cropH / 2;
+      const oldArea = state.cropW * state.cropH;
+      let newW = Math.sqrt(oldArea * aspect);
+      let newH = newW / aspect;
+      if (newW > stageRect.width) { newW = stageRect.width; newH = newW / aspect; }
+      if (newH > stageRect.height) { newH = stageRect.height; newW = newH * aspect; }
+      state.cropW = newW;
+      state.cropH = newH;
+      state.cropX = clamp(centerX - newW / 2, 0, stageRect.width - newW);
+      state.cropY = clamp(centerY - newH / 2, 0, stageRect.height - newH);
+      updateCropBox();
     }
 
     function updateLockButton() {
@@ -408,11 +441,31 @@
       elements.zoomValue.textContent = `${state.zoom.toFixed(1).replace(/\.0$/, '')}x`;
     }
 
-    function fitImageToViewport(resetZoom = true, preserveView = false) {
+    function fitImageToViewport(resetZoom = true, _preserveView = false) {
       if (!state.image) return;
 
       const stageRect = elements.cropStage.getBoundingClientRect();
-      const fitScale = Math.max(stageRect.width / state.originalWidth, stageRect.height / state.originalHeight);
+      const stageW = stageRect.width;
+      const stageH = stageRect.height;
+
+      if (resetZoom || !state.cropW || !state.cropH) {
+        const aspect = state.width / state.height;
+        let boxW, boxH;
+        if (stageW / stageH > aspect) {
+          boxH = stageH;
+          boxW = boxH * aspect;
+        } else {
+          boxW = stageW;
+          boxH = boxW / aspect;
+        }
+        state.cropX = (stageW - boxW) / 2;
+        state.cropY = (stageH - boxH) / 2;
+        state.cropW = boxW;
+        state.cropH = boxH;
+        updateCropBox();
+      }
+
+      const fitScale = Math.max(state.cropW / state.originalWidth, state.cropH / state.originalHeight);
       state.baseScale = fitScale;
       state.minScale = 1;
       state.imageWidth = state.originalWidth * fitScale;
@@ -423,9 +476,6 @@
         elements.zoomSlider.value = '1';
         state.offsetX = 0;
         state.offsetY = 0;
-      } else if (!preserveView) {
-        state.offsetX = clamp(state.offsetX, -(displayWidth() - stageRect.width) / 2, (displayWidth() - stageRect.width) / 2);
-        state.offsetY = clamp(state.offsetY, -(displayHeight() - stageRect.height) / 2, (displayHeight() - stageRect.height) / 2);
       }
 
       updateZoomLabel();
@@ -443,11 +493,17 @@
     }
 
     function constrainOffsets() {
-      const rect = elements.cropStage.getBoundingClientRect();
-      const maxX = Math.max(0, (displayWidth() - rect.width) / 2);
-      const maxY = Math.max(0, (displayHeight() - rect.height) / 2);
-      state.offsetX = clamp(state.offsetX, -maxX, maxX);
-      state.offsetY = clamp(state.offsetY, -maxY, maxY);
+      const stageRect = elements.cropStage.getBoundingClientRect();
+      const stageW = stageRect.width;
+      const stageH = stageRect.height;
+      const dW = displayWidth();
+      const dH = displayHeight();
+      const minX = state.cropX + state.cropW - stageW / 2 - dW / 2;
+      const maxX = state.cropX - stageW / 2 + dW / 2;
+      const minY = state.cropY + state.cropH - stageH / 2 - dH / 2;
+      const maxY = state.cropY - stageH / 2 + dH / 2;
+      state.offsetX = clamp(state.offsetX, Math.min(minX, maxX), Math.max(minX, maxX));
+      state.offsetY = clamp(state.offsetY, Math.min(minY, maxY), Math.max(minY, maxY));
     }
 
     function renderImageTransform() {
@@ -525,11 +581,17 @@
       if (!ctx) return null;
 
       const stageRect = elements.cropStage.getBoundingClientRect();
-      const scaleOutput = state.width / stageRect.width;
+      const stageW = stageRect.width;
+      const stageH = stageRect.height;
+      const scaleOutput = state.width / state.cropW;
       const drawWidth = displayWidth() * scaleOutput;
       const drawHeight = displayHeight() * scaleOutput;
-      const centerX = state.width / 2 + state.offsetX * scaleOutput;
-      const centerY = state.height / 2 + state.offsetY * scaleOutput;
+      const imgCenterX = stageW / 2 + state.offsetX;
+      const imgCenterY = stageH / 2 + state.offsetY;
+      const cropCenterX = state.cropX + state.cropW / 2;
+      const cropCenterY = state.cropY + state.cropH / 2;
+      const centerX = state.width / 2 + (imgCenterX - cropCenterX) * scaleOutput;
+      const centerY = state.height / 2 + (imgCenterY - cropCenterY) * scaleOutput;
       const dx = centerX - drawWidth / 2;
       const dy = centerY - drawHeight / 2;
 
@@ -544,6 +606,94 @@
           state.fileType,
           state.fileType === 'image/jpeg' || state.fileType === 'image/webp' ? 0.92 : undefined
         );
+      });
+    }
+
+    function updateCropBox() {
+      const { cropX: x, cropY: y, cropW: w, cropH: h } = state;
+      elements.cropGrid.style.left = `${x}px`;
+      elements.cropGrid.style.top = `${y}px`;
+      elements.cropGrid.style.width = `${w}px`;
+      elements.cropGrid.style.height = `${h}px`;
+      elements.cropOverlay.style.clipPath =
+        `path('M 0 0 L 100000 0 L 100000 100000 L 0 100000 Z M ${x} ${y} L ${x} ${y + h} L ${x + w} ${y + h} L ${x + w} ${y} Z')`;
+    }
+
+    function setupCropBoxDragging() {
+      const MIN = 50;
+
+      elements.cropGrid.addEventListener('pointerdown', (e) => {
+        if (!state.image) return;
+        if (e.target.classList.contains('crop-handle')) return;
+        e.stopPropagation();
+        const stageRect = elements.cropStage.getBoundingClientRect();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const origX = state.cropX;
+        const origY = state.cropY;
+
+        const onMove = (e) => {
+          state.cropX = clamp(origX + e.clientX - startX, 0, stageRect.width - state.cropW);
+          state.cropY = clamp(origY + e.clientY - startY, 0, stageRect.height - state.cropH);
+          updateCropBox();
+          constrainOffsets();
+        };
+        const onUp = () => {
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          estimateOutputSize();
+        };
+        elements.cropGrid.setPointerCapture(e.pointerId);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+      });
+
+      elements.cropGrid.querySelectorAll('.crop-handle').forEach((handle) => {
+        handle.addEventListener('pointerdown', (e) => {
+          if (!state.image) return;
+          e.stopPropagation();
+          const dir = handle.dataset.handle;
+          const stageRect = elements.cropStage.getBoundingClientRect();
+          const startX = e.clientX;
+          const startY = e.clientY;
+          const origX = state.cropX;
+          const origY = state.cropY;
+          const origW = state.cropW;
+          const origH = state.cropH;
+          const scaleX = state.width / origW;
+          const scaleY = state.height / origH;
+
+          const onMove = (e) => {
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            let newX = origX, newY = origY, newW = origW, newH = origH;
+            if (dir.includes('e')) newW = clamp(origW + dx, MIN, stageRect.width - origX);
+            if (dir.includes('w')) { newW = clamp(origW - dx, MIN, origX + origW); newX = origX + origW - newW; }
+            if (dir.includes('s')) newH = clamp(origH + dy, MIN, stageRect.height - origY);
+            if (dir.includes('n')) { newH = clamp(origH - dy, MIN, origY + origH); newY = origY + origH - newH; }
+            state.cropX = newX;
+            state.cropY = newY;
+            state.cropW = newW;
+            state.cropH = newH;
+            state.width = Math.max(50, Math.round(newW * scaleX));
+            state.height = Math.max(50, Math.round(newH * scaleY));
+            state.selectedGroup = 'Custom';
+            state.activePresetId = null;
+            elements.groupSelect.value = 'Custom';
+            syncDimensionInputs();
+            updateCropBox();
+            constrainOffsets();
+          };
+          const onUp = () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            renderPresets();
+            estimateOutputSize();
+          };
+          handle.setPointerCapture(e.pointerId);
+          window.addEventListener('pointermove', onMove);
+          window.addEventListener('pointerup', onUp);
+        });
       });
     }
 
