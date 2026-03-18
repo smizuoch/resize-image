@@ -28,6 +28,27 @@
   <meta name="twitter:image" content="https://smizuoch.me/resize-image/ogp.png" />
   <meta name="twitter:image:alt" content="resize-image の画像サイズ変更ツールの共有画像" />
 
+  <script>
+    (() => {
+      const storageKey = 'resize-image-theme';
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      let theme = systemTheme;
+      try {
+        const savedTheme = localStorage.getItem(storageKey);
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          theme = savedTheme;
+        }
+      } catch {
+        theme = systemTheme;
+      }
+      document.documentElement.dataset.theme = theme;
+      const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeColorMeta) {
+        themeColorMeta.content = theme === 'dark' ? '#101725' : '#2563ff';
+      }
+    })();
+  </script>
+
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -108,6 +129,9 @@
       --seo-card-border: rgba(217, 217, 223, 0.9);
       --seo-shadow: 0 18px 60px rgba(0, 0, 0, 0.08);
       --seo-text: #45454d;
+      --theme-toggle-bg: rgba(255, 255, 255, 0.78);
+      --theme-toggle-border: rgba(31, 31, 33, 0.08);
+      --theme-toggle-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
       --illustration-stroke: #222;
       --illustration-accent: #c9c9f7;
       --radius-xl: 20px;
@@ -137,10 +161,76 @@
     }
 
     .app-shell {
+      position: relative;
       min-height: 100vh;
       padding: 24px;
       display: grid;
       place-items: center;
+    }
+
+    .theme-toggle {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      width: 50px;
+      height: 50px;
+      border: 1px solid var(--theme-toggle-border);
+      border-radius: 999px;
+      background: var(--theme-toggle-bg);
+      color: var(--text);
+      box-shadow: var(--theme-toggle-shadow);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      z-index: 20;
+      transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .theme-toggle:hover {
+      transform: translateY(-1px);
+    }
+
+    .theme-toggle:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 3px;
+    }
+
+    .theme-toggle svg {
+      width: 22px;
+      height: 22px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .theme-icon-sun,
+    .theme-icon-moon {
+      grid-area: 1 / 1;
+      transition: opacity 0.16s ease, transform 0.16s ease;
+    }
+
+    .theme-icon-sun {
+      opacity: 0;
+      transform: scale(0.72) rotate(-18deg);
+    }
+
+    .theme-icon-moon {
+      opacity: 1;
+      transform: scale(1) rotate(0deg);
+    }
+
+    :root[data-theme="dark"] .theme-icon-sun {
+      opacity: 1;
+      transform: scale(1) rotate(0deg);
+    }
+
+    :root[data-theme="dark"] .theme-icon-moon {
+      opacity: 0;
+      transform: scale(0.72) rotate(18deg);
     }
 
     .dialog {
@@ -753,62 +843,63 @@
       margin-top: 24px;
     }
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        color-scheme: dark;
-        --bg-top: #09111c;
-        --bg: #121b2a;
-        --surface: #172131;
-        --panel: #101725;
-        --text: #eef3fb;
-        --muted: #9facc0;
-        --line: #283449;
-        --blue: #7ea6ff;
-        --blue-hover: #96b7ff;
-        --shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
-        --workspace-bg: #0d1624;
-        --dropzone-border: #30405b;
-        --dropzone-bg: #121d2d;
-        --dropzone-drag-bg: #17263c;
-        --dropzone-drag-border: #7ea6ff;
-        --dropzone-plus-bg: rgba(126, 166, 255, 0.18);
-        --dropzone-plus-text: #b4c7ff;
-        --dropzone-link: #9fb9ff;
-        --crop-stage-bg: #0a1320;
-        --crop-grid-shadow: rgba(255, 255, 255, 0.14);
-        --crop-grid-line: rgba(255, 255, 255, 0.38);
-        --crop-handle-border: #09111c;
-        --side-panel-bg: #101725;
-        --description-text: #b9c5d7;
-        --label-text: #b1bdcf;
-        --input-bg: #172233;
-        --input-focus-border: #7ea6ff;
-        --input-focus-bg: #1d2b41;
-        --lock-bg: #7ea6ff;
-        --lock-text: #08111d;
-        --lock-unlocked-bg: #243249;
-        --lock-unlocked-text: #d3dceb;
-        --thumb-card-bg: #141f30;
-        --thumb-card-hover-border: #5978bf;
-        --thumb-card-hover-bg: #1a2840;
-        --thumb-card-active-border: #9db9ff;
-        --thumb-card-active-bg: #182336;
-        --thumb-preview-bg: #0f1826;
-        --thumb-preview-box-bg: #29364b;
-        --size-text: #e4eaf4;
-        --reset-bg: #192335;
-        --reset-text: #eef3fb;
-        --secondary-bg: #141f30;
-        --secondary-border: #33435e;
-        --secondary-text: #e8edf7;
-        --secondary-hover-bg: #1b2940;
-        --seo-card-bg: rgba(16, 23, 37, 0.78);
-        --seo-card-border: rgba(117, 137, 173, 0.32);
-        --seo-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
-        --seo-text: #c1cbda;
-        --illustration-stroke: #eaf0ff;
-        --illustration-accent: #546788;
-      }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg-top: #09111c;
+      --bg: #121b2a;
+      --surface: #172131;
+      --panel: #101725;
+      --text: #eef3fb;
+      --muted: #9facc0;
+      --line: #283449;
+      --blue: #7ea6ff;
+      --blue-hover: #96b7ff;
+      --shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
+      --workspace-bg: #0d1624;
+      --dropzone-border: #30405b;
+      --dropzone-bg: #121d2d;
+      --dropzone-drag-bg: #17263c;
+      --dropzone-drag-border: #7ea6ff;
+      --dropzone-plus-bg: rgba(126, 166, 255, 0.18);
+      --dropzone-plus-text: #b4c7ff;
+      --dropzone-link: #9fb9ff;
+      --crop-stage-bg: #0a1320;
+      --crop-grid-shadow: rgba(255, 255, 255, 0.14);
+      --crop-grid-line: rgba(255, 255, 255, 0.38);
+      --crop-handle-border: #09111c;
+      --side-panel-bg: #101725;
+      --description-text: #b9c5d7;
+      --label-text: #b1bdcf;
+      --input-bg: #172233;
+      --input-focus-border: #7ea6ff;
+      --input-focus-bg: #1d2b41;
+      --lock-bg: #7ea6ff;
+      --lock-text: #08111d;
+      --lock-unlocked-bg: #243249;
+      --lock-unlocked-text: #d3dceb;
+      --thumb-card-bg: #141f30;
+      --thumb-card-hover-border: #5978bf;
+      --thumb-card-hover-bg: #1a2840;
+      --thumb-card-active-border: #9db9ff;
+      --thumb-card-active-bg: #182336;
+      --thumb-preview-bg: #0f1826;
+      --thumb-preview-box-bg: #29364b;
+      --size-text: #e4eaf4;
+      --reset-bg: #192335;
+      --reset-text: #eef3fb;
+      --secondary-bg: #141f30;
+      --secondary-border: #33435e;
+      --secondary-text: #e8edf7;
+      --secondary-hover-bg: #1b2940;
+      --seo-card-bg: rgba(16, 23, 37, 0.78);
+      --seo-card-border: rgba(117, 137, 173, 0.32);
+      --seo-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+      --seo-text: #c1cbda;
+      --theme-toggle-bg: rgba(16, 23, 37, 0.76);
+      --theme-toggle-border: rgba(148, 169, 211, 0.2);
+      --theme-toggle-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
+      --illustration-stroke: #eaf0ff;
+      --illustration-accent: #546788;
     }
 
     @media (max-width: 980px) {
@@ -894,6 +985,13 @@
         font-size: 24px;
       }
 
+      .theme-toggle {
+        top: 12px;
+        right: 12px;
+        width: 46px;
+        height: 46px;
+      }
+
       .seo-text,
       .seo-list {
         font-size: 15px;
@@ -904,6 +1002,15 @@
 <body>
   <main>
     <div class="app-shell">
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="ダークモードに切り替え" title="ダークモードに切り替え">
+        <svg class="theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 14.2A7.8 7.8 0 0 1 9.8 4a8.6 8.6 0 1 0 10.2 10.2Z" />
+        </svg>
+        <svg class="theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2.5V5.2M12 18.8v2.7M21.5 12h-2.7M5.2 12H2.5M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3" />
+        </svg>
+      </button>
       <section class="dialog" aria-labelledby="pageTitle">
         <section class="workspace">
         <label class="dropzone" id="dropzone" tabindex="0" aria-label="画像をアップロード">
@@ -1058,6 +1165,7 @@
   <script>
     const MAX_FILE_SIZE_MB = 500;
     const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+    const THEME_STORAGE_KEY = 'resize-image-theme';
 
     const presetGroups = {
       Instagram: [
@@ -1146,6 +1254,7 @@
     };
 
     const elements = {
+      themeToggle: document.getElementById('themeToggle'),
       dropzone: document.getElementById('dropzone'),
       fileInput: document.getElementById('fileInput'),
       editorLayout: document.getElementById('editorLayout'),
@@ -1176,6 +1285,7 @@
       renderPresets();
       syncDimensionInputs();
       updateLockButton();
+      updateThemeToggle();
       updateCanvasAspect();
       bindEvents();
       elements.originalSize.textContent = '--';
@@ -1257,6 +1367,8 @@
     }
 
     function bindEvents() {
+      elements.themeToggle.addEventListener('click', toggleTheme);
+
       elements.dropzone.addEventListener('click', () => elements.fileInput.click());
       elements.dropzone.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -1783,15 +1895,66 @@
     const themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
     const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 
+    function readStoredTheme() {
+      try {
+        const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+        return savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function writeStoredTheme(theme) {
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+      } catch {
+        // Ignore storage errors and keep the theme only for the current session.
+      }
+    }
+
+    function resolveTheme() {
+      return readStoredTheme() || (themeMedia.matches ? 'dark' : 'light');
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      syncThemeColor();
+      updateThemeToggle();
+    }
+
+    function applySavedTheme() {
+      applyTheme(resolveTheme());
+    }
+
+    function updateThemeToggle() {
+      if (!elements.themeToggle) return;
+      const nextTheme = document.documentElement.dataset.theme === 'dark' ? '通常' : 'ダーク';
+      const label = `${nextTheme}モードに切り替え`;
+      elements.themeToggle.setAttribute('aria-label', label);
+      elements.themeToggle.setAttribute('title', label);
+    }
+
+    function toggleTheme() {
+      const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      writeStoredTheme(nextTheme);
+      applyTheme(nextTheme);
+    }
+
     function syncThemeColor() {
       if (!themeColorMeta) return;
-      themeColorMeta.content = themeMedia.matches ? '#101725' : '#2563ff';
+      themeColorMeta.content = document.documentElement.dataset.theme === 'dark' ? '#101725' : '#2563ff';
     }
 
     if (typeof themeMedia.addEventListener === 'function') {
-      themeMedia.addEventListener('change', syncThemeColor);
+      themeMedia.addEventListener('change', () => {
+        if (readStoredTheme()) return;
+        applySavedTheme();
+      });
     } else if (typeof themeMedia.addListener === 'function') {
-      themeMedia.addListener(syncThemeColor);
+      themeMedia.addListener(() => {
+        if (readStoredTheme()) return;
+        applySavedTheme();
+      });
     }
 
     syncThemeColor();
