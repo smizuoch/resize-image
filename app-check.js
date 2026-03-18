@@ -1,4 +1,7 @@
 
+    const MAX_FILE_SIZE_MB = 500;
+    const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
     const presetGroups = {
       Instagram: [
         { id: 'instagram-post', label: '投稿', width: 1080, height: 1080 },
@@ -311,8 +314,8 @@
         elements.statusNote.textContent = '対応形式は JPEG / PNG / WEBP / HEIC です。';
         return;
       }
-      if (file.size > 40 * 1024 * 1024) {
-        elements.statusNote.textContent = '40 MB 以下の画像を選択してください。';
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        elements.statusNote.textContent = `${MAX_FILE_SIZE_MB} MB 以下の画像を選択してください。`;
         return;
       }
 
