@@ -100,6 +100,7 @@
       --crop-stage-bg: #d6d6dc;
       --crop-grid-shadow: rgba(255, 255, 255, 0.55);
       --crop-grid-line: rgba(255, 255, 255, 0.95);
+      --crop-overlay-bg: rgba(15, 23, 42, 0.28);
       --crop-handle-border: #fff;
       --side-panel-bg: #ffffff;
       --description-text: #45454d;
@@ -440,6 +441,7 @@
       inset: 0;
       pointer-events: none;
       z-index: 1;
+      background: var(--crop-overlay-bg);
     }
 
     .crop-handle {
@@ -591,7 +593,7 @@
 
     .dimensions-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 84px;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       gap: 10px;
       align-items: end;
     }
@@ -866,6 +868,7 @@
       --crop-stage-bg: #0a1320;
       --crop-grid-shadow: rgba(255, 255, 255, 0.14);
       --crop-grid-line: rgba(255, 255, 255, 0.38);
+      --crop-overlay-bg: rgba(3, 8, 18, 0.42);
       --crop-handle-border: #09111c;
       --side-panel-bg: #101725;
       --description-text: #b9c5d7;
@@ -999,7 +1002,7 @@
     }
   </style>
   <!-- Cloudflare Web Analytics -->
-  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "6dfac24b22d748ae80a976a586911542"}'></script>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;:&quot;6dfac24b22d748ae80a976a586911542&quot;}"></script>
   <!-- End Cloudflare Web Analytics -->
 </head>
 <body>
@@ -1017,7 +1020,7 @@
       <section class="dialog" aria-labelledby="pageTitle">
         <section class="workspace">
         <label class="dropzone" id="dropzone" tabindex="0" aria-label="画像をアップロード">
-          <input class="sr-only" id="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" />
+          <input class="sr-only" id="fileInput" type="file" accept="image/jpeg,image/png,image/webp" />
           <div id="dropzoneContent">
             <div class="dropzone-icon" aria-hidden="true">
               <svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1029,7 +1032,7 @@
               <div class="dropzone-plus">+</div>
             </div>
             <p class="dropzone-title">画像をドラッグ＆ドロップ または<span class="link">参照</span></p>
-            <p class="dropzone-help">ファイルは JPEG, JPG, PNG, WEBP または HEIC、かつ 500 MB 以下である必要があります</p>
+            <p class="dropzone-help">ファイルは JPEG, JPG, PNG, WEBP、かつ 500 MB 以下である必要があります</p>
           </div>
         </label>
 
@@ -1080,7 +1083,7 @@
 
           <div class="stack">
             <div class="field">
-              <label for="groupSelect">縦横比</label>
+              <label for="groupSelect">プリセット</label>
               <select class="select" id="groupSelect"></select>
             </div>
 
@@ -1107,12 +1110,6 @@
                 <input class="text-input" id="heightInput" type="number" min="50" max="6000" step="1" />
               </div>
 
-              <div class="mini-field unit-field">
-                <label for="unitSelect">単位</label>
-                <select class="select" id="unitSelect">
-                  <option value="px">px</option>
-                </select>
-              </div>
             </div>
           </div>
 
@@ -1125,6 +1122,7 @@
           </div>
 
             <div class="button-row">
+              <button class="secondary" id="replaceButton" type="button">画像を差し替え</button>
               <button class="primary" id="downloadButton" type="button">ダウンロード</button>
             </div>
             <div class="status-note" id="statusNote"></div>
@@ -1168,6 +1166,7 @@
   <script>
     const MAX_FILE_SIZE_MB = 500;
     const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+    const MAX_OUTPUT_DIMENSION = 6000;
     const THEME_STORAGE_KEY = 'resize-image-theme';
 
     const presetGroups = {
@@ -1253,7 +1252,9 @@
       cropH: 0,
       toastDismissed: false,
       estimateTimer: null,
-      previewBlobUrl: ''
+      previewBlobUrl: '',
+      stageWidth: 0,
+      stageHeight: 0
     };
 
     const elements = {
@@ -1271,7 +1272,7 @@
       widthInput: document.getElementById('widthInput'),
       heightInput: document.getElementById('heightInput'),
       lockButton: document.getElementById('lockButton'),
-      unitSelect: document.getElementById('unitSelect'),
+      replaceButton: document.getElementById('replaceButton'),
       originalSize: document.getElementById('originalSize'),
       outputSize: document.getElementById('outputSize'),
       resetButton: document.getElementById('resetButton'),
@@ -1426,6 +1427,10 @@
         updateLockButton();
       });
 
+      elements.replaceButton.addEventListener('click', () => {
+        elements.fileInput.click();
+      });
+
       elements.zoomSlider.addEventListener('input', () => {
         state.zoom = clamp(parseFloat(elements.zoomSlider.value) || 1, 1, 10);
         updateZoomLabel();
@@ -1472,18 +1477,14 @@
       setupCropBoxDragging();
       window.addEventListener('resize', () => {
         if (!state.image) return;
-        const stageRect = elements.cropStage.getBoundingClientRect();
-        state.cropX = clamp(state.cropX, 0, Math.max(0, stageRect.width - state.cropW));
-        state.cropY = clamp(state.cropY, 0, Math.max(0, stageRect.height - state.cropH));
-        updateCropBox();
         fitImageToViewport(false, true);
       });
     }
 
     async function loadFile(file) {
-      const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+      const allowed = ['image/jpeg', 'image/png', 'image/webp'];
       if (!allowed.includes(file.type)) {
-        elements.statusNote.textContent = '対応形式は JPEG / PNG / WEBP / HEIC です。';
+        elements.statusNote.textContent = '対応形式は JPEG / PNG / WEBP です。';
         return;
       }
       if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -1501,8 +1502,9 @@
         state.originalWidth = image.naturalWidth;
         state.originalHeight = image.naturalHeight;
         state.originalSize = file.size;
-        state.width = image.naturalWidth;
-        state.height = image.naturalHeight;
+        const initialSize = fitDimensionsWithinLimit(image.naturalWidth, image.naturalHeight);
+        state.width = initialSize.width;
+        state.height = initialSize.height;
         state.selectedGroup = 'Custom';
         state.activePresetId = null;
         state.cropW = 0;
@@ -1517,7 +1519,9 @@
         fitImageToViewport(true);
         elements.originalSize.textContent = formatBytes(file.size);
         estimateOutputSize();
-        elements.statusNote.textContent = `${image.naturalWidth} × ${image.naturalHeight} の画像を読み込みました。`;
+        elements.statusNote.textContent = initialSize.scaled
+          ? `${image.naturalWidth} × ${image.naturalHeight} の画像を読み込みました。出力サイズは最大 ${MAX_OUTPUT_DIMENSION}px に収まるよう ${initialSize.width} × ${initialSize.height} で開始します。`
+          : `${image.naturalWidth} × ${image.naturalHeight} の画像を読み込みました。`;
       } catch (error) {
         console.error(error);
         elements.statusNote.textContent = '画像の読み込みに失敗しました。';
@@ -1544,13 +1548,21 @@
 
     function onDimensionInput(kind) {
       const previousRatio = state.width / state.height;
-      let nextWidth = clamp(parseInt(elements.widthInput.value || state.width, 10) || state.width, 50, 6000);
-      let nextHeight = clamp(parseInt(elements.heightInput.value || state.height, 10) || state.height, 50, 6000);
+      let nextWidth = clamp(parseInt(elements.widthInput.value || state.width, 10) || state.width, 50, MAX_OUTPUT_DIMENSION);
+      let nextHeight = clamp(parseInt(elements.heightInput.value || state.height, 10) || state.height, 50, MAX_OUTPUT_DIMENSION);
 
       if (kind === 'width') {
-        if (state.locked) nextHeight = clamp(Math.round(nextWidth / previousRatio), 50, 6000);
+        if (state.locked) {
+          const constrained = fitDimensionsWithinLimit(nextWidth, Math.max(50, Math.round(nextWidth / previousRatio)));
+          nextWidth = constrained.width;
+          nextHeight = constrained.height;
+        }
       } else {
-        if (state.locked) nextWidth = clamp(Math.round(nextHeight * previousRatio), 50, 6000);
+        if (state.locked) {
+          const constrained = fitDimensionsWithinLimit(Math.max(50, Math.round(nextHeight * previousRatio)), nextHeight);
+          nextWidth = constrained.width;
+          nextHeight = constrained.height;
+        }
       }
 
       state.width = nextWidth;
@@ -1603,14 +1615,33 @@
       elements.zoomValue.textContent = `${state.zoom.toFixed(1).replace(/\.0$/, '')}x`;
     }
 
-    function fitImageToViewport(resetZoom = true, _preserveView = false) {
+    function fitImageToViewport(resetZoom = true, preserveView = false) {
       if (!state.image) return;
 
       const stageRect = elements.cropStage.getBoundingClientRect();
       const stageW = stageRect.width;
       const stageH = stageRect.height;
 
-      if (resetZoom || !state.cropW || !state.cropH) {
+      if (preserveView && state.stageWidth && state.stageHeight && state.cropW && state.cropH) {
+        const widthRatio = stageW / state.stageWidth;
+        const heightRatio = stageH / state.stageHeight;
+        const centerX = (state.cropX + state.cropW / 2) * widthRatio;
+        const centerY = (state.cropY + state.cropH / 2) * heightRatio;
+        let nextW = state.cropW * widthRatio;
+        let nextH = state.cropH * heightRatio;
+        const fitRatio = Math.min(stageW / nextW || 1, stageH / nextH || 1, 1);
+        nextW *= fitRatio;
+        nextH *= fitRatio;
+        state.cropW = nextW;
+        state.cropH = nextH;
+        state.cropX = clamp(centerX - nextW / 2, 0, Math.max(0, stageW - nextW));
+        state.cropY = clamp(centerY - nextH / 2, 0, Math.max(0, stageH - nextH));
+        if (!resetZoom) {
+          state.offsetX *= widthRatio;
+          state.offsetY *= heightRatio;
+        }
+        updateCropBox();
+      } else if (resetZoom || !state.cropW || !state.cropH) {
         const aspect = state.width / state.height;
         let boxW, boxH;
         if (stageW / stageH > aspect) {
@@ -1644,6 +1675,8 @@
       constrainOffsets();
       renderImageTransform();
       updateToast();
+      state.stageWidth = stageW;
+      state.stageHeight = stageH;
     }
 
     function displayWidth() {
@@ -1823,23 +1856,53 @@
           const origY = state.cropY;
           const origW = state.cropW;
           const origH = state.cropH;
-          const scaleX = state.width / origW;
-          const scaleY = state.height / origH;
+          const outputAspect = state.width / state.height;
+          const origOutputW = state.width;
+          const origOutputH = state.height;
 
           const onMove = (e) => {
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
             let newX = origX, newY = origY, newW = origW, newH = origH;
-            if (dir.includes('e')) newW = clamp(origW + dx, MIN, stageRect.width - origX);
-            if (dir.includes('w')) { newW = clamp(origW - dx, MIN, origX + origW); newX = origX + origW - newW; }
-            if (dir.includes('s')) newH = clamp(origH + dy, MIN, stageRect.height - origY);
-            if (dir.includes('n')) { newH = clamp(origH - dy, MIN, origY + origH); newY = origY + origH - newH; }
+            if (state.locked) {
+              const lockedBox = resizeLockedCropBox({
+                dir,
+                pointerX: e.clientX,
+                pointerY: e.clientY,
+                stageRect,
+                origX,
+                origY,
+                origW,
+                origH,
+                outputAspect,
+                minSize: MIN
+              });
+              newX = lockedBox.x;
+              newY = lockedBox.y;
+              newW = lockedBox.w;
+              newH = lockedBox.h;
+            } else {
+              if (dir.includes('e')) newW = clamp(origW + dx, MIN, stageRect.width - origX);
+              if (dir.includes('w')) { newW = clamp(origW - dx, MIN, origX + origW); newX = origX + origW - newW; }
+              if (dir.includes('s')) newH = clamp(origH + dy, MIN, stageRect.height - origY);
+              if (dir.includes('n')) { newH = clamp(origH - dy, MIN, origY + origH); newY = origY + origH - newH; }
+            }
             state.cropX = newX;
             state.cropY = newY;
             state.cropW = newW;
             state.cropH = newH;
-            state.width = Math.max(50, Math.round(newW * scaleX));
-            state.height = Math.max(50, Math.round(newH * scaleY));
+            if (state.locked) {
+              const scale = newW / origW;
+              const constrained = fitDimensionsWithinLimit(
+                Math.max(MIN, Math.round(origOutputW * scale)),
+                Math.max(MIN, Math.round(origOutputH * scale))
+              );
+              state.width = constrained.width;
+              state.height = constrained.height;
+            } else {
+              state.width = clamp(Math.round(origOutputW * (newW / origW)), MIN, MAX_OUTPUT_DIMENSION);
+              state.height = clamp(Math.round(origOutputH * (newH / origH)), MIN, MAX_OUTPUT_DIMENSION);
+            }
             state.selectedGroup = 'Custom';
             state.activePresetId = null;
             elements.groupSelect.value = 'Custom';
@@ -1889,6 +1952,84 @@
       if (type === 'image/jpeg') return 'jpg';
       if (type === 'image/webp') return 'webp';
       return 'png';
+    }
+
+    function fitDimensionsWithinLimit(width, height, max = MAX_OUTPUT_DIMENSION) {
+      const safeWidth = Math.max(50, Math.round(width));
+      const safeHeight = Math.max(50, Math.round(height));
+      const scale = Math.min(1, max / safeWidth, max / safeHeight);
+      return {
+        width: Math.max(50, Math.round(safeWidth * scale)),
+        height: Math.max(50, Math.round(safeHeight * scale)),
+        scaled: scale < 1
+      };
+    }
+
+    function clampWithinBounds(value, min, max) {
+      if (max <= min) return max;
+      return clamp(value, min, max);
+    }
+
+    function resizeLockedCropBox({ dir, pointerX, pointerY, stageRect, origX, origY, origW, origH, outputAspect, minSize }) {
+      const minWidth = Math.max(minSize, minSize * outputAspect);
+      const minHeight = Math.max(minSize, minSize / outputAspect);
+      const centerX = origX + origW / 2;
+      const centerY = origY + origH / 2;
+
+      if (dir === 'n' || dir === 's') {
+        const anchorY = dir === 'n' ? origY + origH : origY;
+        const maxH = dir === 'n' ? anchorY : stageRect.height - anchorY;
+        const maxW = 2 * Math.min(centerX, stageRect.width - centerX);
+        const proposedH = Math.abs(anchorY - pointerY);
+        const allowedMaxH = Math.min(maxH, maxW / outputAspect);
+        const h = clampWithinBounds(proposedH, minHeight, allowedMaxH);
+        const w = h * outputAspect;
+        return {
+          x: centerX - w / 2,
+          y: dir === 'n' ? anchorY - h : anchorY,
+          w,
+          h
+        };
+      }
+
+      if (dir === 'e' || dir === 'w') {
+        const anchorX = dir === 'e' ? origX : origX + origW;
+        const maxW = dir === 'e' ? stageRect.width - anchorX : anchorX;
+        const maxH = 2 * Math.min(centerY, stageRect.height - centerY);
+        const proposedW = Math.abs(anchorX - pointerX);
+        const allowedMaxW = Math.min(maxW, maxH * outputAspect);
+        const w = clampWithinBounds(proposedW, minWidth, allowedMaxW);
+        const h = w / outputAspect;
+        return {
+          x: dir === 'e' ? anchorX : anchorX - w,
+          y: centerY - h / 2,
+          w,
+          h
+        };
+      }
+
+      const anchorX = dir.includes('w') ? origX + origW : origX;
+      const anchorY = dir.includes('n') ? origY + origH : origY;
+      const maxW = dir.includes('w') ? anchorX : stageRect.width - anchorX;
+      const maxH = dir.includes('n') ? anchorY : stageRect.height - anchorY;
+      const proposedW = Math.abs(anchorX - pointerX);
+      const proposedH = Math.abs(anchorY - pointerY);
+      let w = proposedW;
+      let h = proposedH;
+      if (proposedW / Math.max(proposedH, 1) > outputAspect) {
+        h = w / outputAspect;
+      } else {
+        w = h * outputAspect;
+      }
+      const allowedMaxW = Math.min(maxW, maxH * outputAspect);
+      w = clampWithinBounds(w, minWidth, allowedMaxW);
+      h = w / outputAspect;
+      return {
+        x: dir.includes('w') ? anchorX - w : anchorX,
+        y: dir.includes('n') ? anchorY - h : anchorY,
+        w,
+        h
+      };
     }
 
     function clamp(value, min, max) {
